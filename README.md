@@ -1,5 +1,6 @@
 # Scripts
-    Use of several FQL operators have been deprecated in SharePoint Online (as of Feb 2021).
+    Use of several FQL operators and parameters have been deprecated in SharePoint Online 
+    (as of Feb 2021).
     https://techcommunity.microsoft.com/t5/microsoft-search-blog/we-re-making-changes-to-search-in-sharepoint-online/ba-p/1971119
       
     The script examines the query template for Result Sources and Query Rules for FQL keywords.
@@ -15,13 +16,16 @@
 
     [property-spec:]operator(operand [,operand]* [, parameter="value"]*)
 
-    This script looks for the pattern "<operator>(" using the following reserved FQL keywords:
-    "and", "or", "any", "andnot", "count", "decimal", "rank", "near", "onear", "int", "in32", 
-    "int64", "float", "double", "datetime", "max", "min", "range", "phrase", "scope", "filter", 
-    "not", "string", "starts-with", "ends-with", "equals", "words", "xrank"
+    This script looks for: 
+        1.  The pattern "<operator>(" using the following reserved FQL keywords:
+            "and", "or", "any", "andnot", "count", "decimal", "rank", "near", "onear", "int", 
+            "in32", "int64", "float", "double", "datetime", "max", "min", "range", "phrase", 
+            "scope", "filter", "not", "string", "starts-with", "ends-with", "equals", "words", 
+            "xrank"
 
-    Also the following deprecated operators:
-    "count","filter"
+        2.  The following deprecated operators:
+            "count","filter","any"
 
-    Lastly, the following deprecated parameters for the specific operator:
-    "string": ["linguistics","wildcard"]}
+        3.  The following deprecated parameters for the specific operator:
+            "string": ["linguistics","wildcard"]
+

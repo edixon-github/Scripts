@@ -17,8 +17,9 @@
 	Scans a single site and scope or ALL sites for FQL used in Result Sources and Query Rules.
 	
 .DESCRIPTION 
-    Use of FQL has been deprecated in SharePoint Online.  This script will scan a single site 
-    and scope or ALL sites for FQL used in Result Sources and Query Rules.  
+    Use of several FQL operators have been deprecated in SharePoint Online (as of Feb 2021).
+    https://techcommunity.microsoft.com/t5/microsoft-search-blog/we-re-making-changes-to-search-in-sharepoint-online/ba-p/1971119
+      
     The script examines the query template for Result Sources and Query Rules for FQL keywords.
     To run, specificy a user name with Admin privileges.  Then choose to scan "All" sites or
     a single site.  When scanning all sites, add the -All switch and specify the tenant admin 
@@ -26,13 +27,30 @@
     site, specify the site Url (e.g. https://<my_tenant>.sharepoint.com) and the SiteCollection
     or Site scope.
 	
+    FQL Operators
+    FAST Query Language (FQL) operators are keywords that specify Boolean operations or other 
+    constraints to operands. The FQL operator syntax is as follows:
+
+    [property-spec:]operator(operand [,operand]* [, parameter="value"]*)
+
+    This script looks for the pattern "<operator>(" using the following reserved FQL keywords:
+    "and", "or", "any", "andnot", "count", "decimal", "rank", "near", "onear", "int", "in32", 
+    "int64", "float", "double", "datetime", "max", "min", "range", "phrase", "scope", "filter", 
+    "not", "string", "starts-with", "ends-with", "equals", "words", "xrank"
+
+    Also the following deprecated operators:
+    "count","filter"
+
+    Lastly, the following deprecated parameters for the specific operator:
+    "string": ["linguistics","wildcard"]}
+
 .NOTES
 	=========================================
 	File Name 	: Find-SPOFQL.ps1
     Author		: Eric Dixon, Brad Schlintz (he did something, really!)
 
 	Requires	: 
-		PowerShell Version 4.0 or greater, SharePointPnPPowerShellOnline
+		PowerShell Version 5.0 or greater, SharePointPnPPowerShellOnline
 	
 	========================================================================================
 	This Sample Code is provided for the purpose of illustration only and is not intended to 
@@ -73,68 +91,122 @@
 
 #>
 
+if($host.Version.Major -lt 5){
 
-$fql_reserved_keywords = @("and", "or", "any", "andnot", "count", "decimal", "rank", "near", "onear", "int", "in32", "int64", "float", "double", "datetime", "max", "min", "range", "phrase", "scope", "filter", "not", "string", "starts-with", "ends-with", "equals", "words", "xrank")
-
-
-function TemplateHasFQL {
-param($template)
-    if([string]::IsNullOrEmpty($template)){
-        return $false
+Add-Type -TypeDefinition @"
+    public enum ResourceType { 
+        QueryRule;
+        ResultSource;
     }
-    foreach($keyword in $fql_reserved_keywords){
-        if($template.Contains("$keyword(")){
-            return $true
-        }
-    }
-    return $false
+"@
+
+} else {
+
+enum ResourceType { 
+    QueryRule;
+    ResultSource;
 }
 
+}
+
+$fql_reserved_keywords = @("and", "or", "any", "andnot", "count", "decimal", "rank", "near", "onear", "int", "in32", "int64", "float", "double", "datetime", "max", "min", "range", "phrase", "scope", "filter", "not", "string", "starts-with", "ends-with", "equals", "words", "xrank")
+$fql_deprecated_operators = @("count","filter","any")
+$fql_deprecated_paramters = ConvertFrom-Json '{"string":["linguistics","wildcard"]}'
+
+function TemplateHasFQLOperator {
+param($template, $keywords)
+    if([string]::IsNullOrEmpty($template)){
+        return $null
+    }
+    foreach($k in $keywords){
+        if($template.Contains("$k(")){
+            return $k
+        }
+    }
+    return $null
+}
+
+
+function TemplateHasFQLParameter {
+param($template, $parameters)
+    if([string]::IsNullOrEmpty($template)){
+        return $null, $null
+    }
+    foreach($k in $parameters.PSObject.Properties.Name){
+        if($template.Contains("$k(")){
+            foreach($p in $parameters.$k) {
+                if($template.Contains("$p=")) {
+                    return $k,$p
+                }
+            }
+        }
+    }
+    return $null, $null
+}
+
+
+function TestForFQL{
+param($template,$type,$displayName)
+
+    switch($type) {
+        [ResourceType]::QueryRule {$resourceType = "Query Rule"}
+        [ResourceType]::ResultSource {$resourceType = "Result Source"}
+    }
+
+    $fql_op = TemplateHasFQLOperator -template $template -keywords $fql_reserved_keywords
+    if($null -ne $fql_op){
+        $dep_op = TemplateHasFQLOperator -template $template -keywords $fql_deprecated_operators
+        if($null -ne $dep_op){
+            Write-Host "   * Found deprecated FQL operator '$dep_op' in query template for $resourceType '$displayName'" -ForegroundColor Red
+            Write-Host "     $template" -ForegroundColor Red
+        } else {
+            $param_op, $dep_param = TemplateHasFQLParameter -template $template -parameters $fql_deprecated_paramters
+            if ($null -ne $param_op -and $null -ne $dep_param) {
+                Write-Host "   * Found deprecated FQL parameter '$dep_param' for operator '$param_op' in query template for $resourceType '$displayName'" -ForegroundColor Red
+                Write-Host "     $template" -ForegroundColor Red
+            } else {
+                Write-Host "   * Found FQL operator '$fql_op' in query template for $resourceType '$displayName'" -ForegroundColor Yellow
+                Write-Host "     $template" -ForegroundColor Yellow
+            }
+        }
+    }
+    
+}
+
+
 function ParseQueryRules {
-param($xml,$site)
+param($xml)
 
     $query_rules = $xml.SearchConfigurationSettings.SearchQueryConfigurationSettings.SearchQueryConfigurationSettings.QueryRules.QueryRule
     foreach($rule in $query_rules) {
         $query_template = $rule.CreateResultBlockActions.OrderedItems.CreateResultBlockAction._QueryTransform._QueryTemplate
-        if(TemplateHasFQL -template $query_template){
-            Write-Host "   * Found potential FQL in query template for Query Rule '$($rule._DisplayName)'" -ForegroundColor Yellow
-            Write-Host "     $query_template" -ForegroundColor Yellow
-        }
+
+        TestForFQL -template $query_template -type [ResourceType]::QueryRule -displayName $rule._DisplayName
     }
 }
+
 
 function ParseResultSources {
 param($xml)
 
     $sources = $xml.SearchConfigurationSettings.SearchQueryConfigurationSettings.SearchQueryConfigurationSettings.Sources.Source
-    foreach($source in $sources){
+    foreach($source in $sources) {
         $query_template = $source.QueryTransform._QueryTemplate
-        if(TemplateHasFQL -template $query_template){
-            Write-Host "   * Found potential FQL in query template for Result Source '$($source.Name)'" -ForegroundColor Yellow
-            Write-Host "     $query_template" -ForegroundColor Yellow
-        }
-        
+
+        TestForFQL -template $query_template -type [ResourceType]::ResultSource -displayName $source.Name
     }
 }
 
 
 function Main {
-#    $creds = (Get-Credential -Message "Please enter admin credientials for SPO" -UserName $Username)
-
-#    if(-not $creds) {
-#        Write-Host "Please supply valid credentials" -ForegroundColor Red
-#        exit
-#    }
-
+    
     if($All){
         if(-not $TenantAdminSite.StartsWith("https://")) {
             $TenantAdminSite = "https://" + $TenantAdminSite
         }
-#        Connect-SPOService $TenantAdminSite -Credential $creds
         Connect-PnPOnline $TenantAdminSite -UseWebLogin
 
         $sites = @($TenantAdminSite)
-#        $sites += (Get-SPOSite).Url
         $sites += (Get-PnPTenantSite).Url
         $scopes = @("SiteCollection","Site")
 
@@ -155,7 +227,6 @@ function Main {
 
     foreach($s in $sites) {
 
-#        Connect-PnPOnline $s -Credentials $creds
         Connect-PnPOnline $s -UseWebLogin
 
         if($s -eq $TenantAdminSite){
@@ -209,6 +280,9 @@ function Main {
 
     $creds = $null
     Write-Host "Done." -ForegroundColor Green
+    Write-Host
+    Write-Host "Microsoft recommends, where applicable, using the default SharePoint query language, KQL where your business requirements can be similarly met."
+    Write-Host "https://techcommunity.microsoft.com/t5/microsoft-search-blog/we-re-making-changes-to-search-in-sharepoint-online/ba-p/1971119"
 }
 
 Main

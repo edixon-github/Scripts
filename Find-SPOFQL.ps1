@@ -69,7 +69,7 @@
 
 .EXAMPLE
 	.\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -TenantAdminSite https://MyTenant-admin.sharepoint.com/ -All
-    .\Find-SPOFQL.ps1 -UserName admin@m365x342170.onmicrosoft.com -Site https://MyTenant.sharepoint.com -Scope SiteCollection
+    .\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -Site https://MyTenant.sharepoint.com -Scope SiteCollection
 
 #>
 

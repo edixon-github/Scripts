@@ -29,3 +29,8 @@
         3.  The following deprecated parameters for the specific operator:
             "string": ["linguistics","wildcard"]
 
+EXAMPLES
+	# All Sites
+	.\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -TenantAdminSite https://MyTenant-admin.sharepoint.com/ -All
+	# Specific site and scope
+	.\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -Site https://MyTenant.sharepoint.com -Scope SiteCollection

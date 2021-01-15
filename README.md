@@ -34,3 +34,14 @@
 	.\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -TenantAdminSite https://MyTenant-admin.sharepoint.com/ -All
 	# Specific site and scope
 	.\Find-SPOFQL.ps1 -UserName admin@MyTenant.onmicrosoft.com -Site https://MyTenant.sharepoint.com -Scope SiteCollection
+
+    EXAMPLE OUTPUT
+	   * Checking site 'https://MyTenant-admin.sharepoint.com' at scope 'Subscription'...
+	   * Found FQL operator 'string' in query template for Query Rule 'FQL Query Rule - Result Block'
+	     title:string({subjectTerms})
+	   * Found deprecated FQL operator 'filter' in query template for Result Source 'FQL Deprecated Opearator'
+	     filter(and({searchTerms}, "fql"))
+	   * Found deprecated FQL parameter 'linguistics' for operator 'string' in query template for Result Source 'FQL Deprecated Parameter'
+	     string("{searchTerms}", linguistics="off")  
+	   * Found FQL operator 'string' in query template for Result Source 'FQL Test Source'
+	     title:string({searchTerms})
